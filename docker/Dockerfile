@@ -11,11 +11,19 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir packaging \
+#RUN pip3 install --no-cache-dir packaging \
+
+RUN conda install -c conda-forge \
+        jigsaw \
+        jigsawpy \
         meshio \
-        mpi4py
+        mpi4py \
+        rasterio
 
 RUN cd work \
-    && git clone https://github.com/LukeMondy/gLEC.git 
+    && git clone https://github.com/LukeMondy/gLEC.git \
+    && chown -R jovyan:users gLEC \
+    && cd gLEC \
+    && python3 setup.py install
 
 CMD ["start.sh", "jupyter", "notebook", "--NotebookApp.token=''"]
