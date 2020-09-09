@@ -10,11 +10,14 @@ jobs:
       with:
         ref: ${{ github.event.pull_request.head.sha }}
 
-    - name: update jupyter dependencies with repo2docker
+    - name: Create-MyBinderOrg-Cache 
       uses: jupyterhub/repo2docker-action@master
       with:
-        DOCKER_USERNAME: lmondy
+        NO_PUSH: true
+        MYBINDERORG_TAG: ${{ github.event.ref }} # This builds the container on mybinder.org with the branch that was pushed on.
+
+    - name: Push generated image to DockerHub
+      uses: jupyterhub/repo2docker-action@master
+      with:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        BINDER_CACHE: false
-        PUBLIC_REGISTRY_CHECK: true
-        IMAGE_NAME: "lmondy/gLEC"
