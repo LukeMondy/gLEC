@@ -11,3 +11,5 @@ dependencies:
   - numpy
   - scipy
   - matplotlib
+  - pip:
+    - '--editable=.'
