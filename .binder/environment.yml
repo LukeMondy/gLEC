@@ -1,0 +1,13 @@
+name: gLEC
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - jigsaw
+  - jigsawpy
+  - meshio 
+  - mpi4py
+  - rasterio
+  - numpy
+  - scipy
+  - matplotlib
