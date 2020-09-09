@@ -1,3 +1,5 @@
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/LukeMondy/gLEC/master)
+
 # gLEC - Global Landscape Elevation Connectivity
 
 This package calculates Landscape Elevation Connectivity (LEC) on triangular irregular meshes, including global meshes.
