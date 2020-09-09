@@ -1,0 +1,11 @@
+name: Clean notebooks
+
+on: [push, pull_request]
+
+jobs:
+  ensure_clean:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ResearchSoftwareActions/EnsureCleanNotebooksAction@1.1
