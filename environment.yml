@@ -8,10 +8,11 @@ dependencies:
   - jigsawpy
   - matplotlib
   - meshio 
-  - methodtools 
   - mpi4py
   - numpy
   - rasterio
   - scipy
+  - pip
   - pip:
-    - '--editable=.'
+    - '--editable=.'  # Install the gLEC package
+    - methodtools
