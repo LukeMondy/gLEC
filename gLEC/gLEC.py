@@ -3,7 +3,7 @@
 
 import numpy as np
 import time
-from functools import lru_cache
+from methodtools import lru_cache
 from queue import PriorityQueue
 from types import MethodType
 
