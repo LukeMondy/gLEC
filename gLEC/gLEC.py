@@ -182,7 +182,7 @@ class gLEC(object):
         # For each good triangle, calculate the area, and add it to the total
         area = 0.
         for t in good_tris:
-            points = mesh.points[t,:]
+            points = self.mesh.points[t,:]
             area += PolyArea(points[:,0], points[:,1])
 
         return area
