@@ -26,7 +26,8 @@ class gLEC(object):
         self.horizontal_distance_cost_weight = horizontal_distance_cost_weight
 
         if self.horizontal_distance_cost_weight > 0.:
-            self.normalised_area = self.max_fuel / self.horizontal_distance_cost_weight
+            radius = self.max_fuel / self.horizontal_distance_cost_weight 
+            self.normalised_area = np.pi * radius * radius
         else:
             print("WARNING: The horizontal_distance_cost_weight is set to <= 0, and so can't be used to normalise the area",
                     file=stderr)
