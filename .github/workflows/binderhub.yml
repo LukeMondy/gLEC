@@ -19,6 +19,6 @@ jobs:
     - name: Push generated image to DockerHub
       uses: jupyterhub/repo2docker-action@master
       with:
-        BINDER_CACHE: true
+        BINDER_CACHE: false
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
