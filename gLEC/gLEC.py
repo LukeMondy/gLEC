@@ -3,15 +3,34 @@
 
 import numpy as np
 import time
+from sys import stderr
 from functools import lru_cache
 from queue import PriorityQueue
 from types import MethodType
 
 class gLEC(object):
 
-    def __init__(self, mesh, max_fuel = 2000, travel_cost_function = None, neighbour_finding_function = None, neighbours_cache_size = None, other_cache_size = None):
+    def __init__(
+            self,
+            mesh,
+            max_fuel = 2000,
+            horizontal_distance_cost_weight = 0.004,
+            travel_cost_function = None,
+            neighbouring_triangles_function = None,
+            neighbouring_points_function = None,
+            neighbours_cache_size = None,
+            other_cache_size = None):
+
         self.mesh = mesh
         self.max_fuel = max_fuel
+        self.horizontal_distance_cost_weight = horizontal_distance_cost_weight
+
+        if self.horizontal_distance_cost_weight > 0.:
+            self.normalised_area = self.max_fuel / self.horizontal_distance_cost_weight
+        else:
+            print("WARNING: The horizontal_distance_cost_weight is set to <= 0, and so can't be used to normalise the area",
+                    file=stderr)
+            self.normalised_area = float("nan")
 
         if travel_cost_function:
             # Allow the user to define their own cost function
@@ -21,12 +40,19 @@ class gLEC(object):
             # but if they don't, use the default
             self.travel_cost_func = self.strong_elevation_change_cost
 
-        if neighbour_finding_function:
-            # Allow the user to define their own neighbour function
-            self.neighbours_func = MethodType(neighbour_finding_function, self)
+        if neighbouring_triangles_function:
+            # Allow the user to define their own function to find neighbouring triangles
+            self.triangle_neighbours_func = MethodType(neighbouring_triangles_function, self)
         else:
             # but if they don't, use the default
-            self.neighbours_func = self.graph_neighbours
+            self.triangle_neighbours_func = self.get_adjoining_triangles
+
+        if neighbouring_points_function:
+            # Allow the user to define their own function to find neighbouring points
+            self.point_neighbours_func = MethodType(neighbouring_points_function, self)
+        else:
+            # but if they don't, use the default
+            self.point_neighbours_func = self.neighbouring_points_above_sealevel
 
         if not neighbours_cache_size:
             # If no cache size was supplied, make it as big as the mesh
@@ -36,7 +62,8 @@ class gLEC(object):
             other_cache_size = neighbours_cache_size
 
         # Apply a LRU cache to all the hot functions
-        self.neighbours_func = lru_cache(maxsize=neighbours_cache_size)(self.neighbours_func)
+        self.triangle_neighbours_func = lru_cache(maxsize=neighbours_cache_size)(self.triangle_neighbours_func)
+        self.point_neighbours_func = lru_cache(maxsize=neighbours_cache_size)(self.point_neighbours_func)
         self.travel_cost_func = lru_cache(maxsize=other_cache_size)(self.travel_cost_func)
         self.dist_func = lru_cache(maxsize=other_cache_size)(self.distance)
 
@@ -44,7 +71,7 @@ class gLEC(object):
     def distance(self, current, _next):
         # from https://stackoverflow.com/a/1401828
         if current == _next:
-            return 0
+            return 0.
         return np.linalg.norm(self.mesh.points[current]-self.mesh.points[_next])
 
 
@@ -54,12 +81,22 @@ class gLEC(object):
         # fraction being the horizontal distance travelled.
         if current == _next:
             return 0
-        return int(abs(self.mesh.point_data['Z'][current] - self.mesh.point_data['Z'][_next]) + self.dist_func(current, _next)*0.004)
+        return int(
+                # Elevation change
+                abs(self.mesh.point_data['Z'][current] - self.mesh.point_data['Z'][_next]) \
+                        # plus weighted horizontal distance 
+                        + self.dist_func(current, _next) * self.horizontal_distance_cost_weight
+               )
 
 
-    def graph_neighbours(self, current):
-        # Get all the other points from the cells that have the current point in them.
-        points = np.unique(self.mesh.cells_dict['triangle'][np.where(self.mesh.cells_dict['triangle']==current)[0]])
+    def get_adjoining_triangles(self, current):
+        # Get all the triangles that have the current point in them.
+        return self.mesh.cells_dict['triangle'][np.where(self.mesh.cells_dict['triangle']==current)[0]]
+
+
+    def neighbouring_points_above_sealevel(self, current):
+        # Get all the other points from the cells that have the current point in them, and remove duplicates
+        points = np.unique(self.triangle_neighbours_func(current))
         # remove the current point from these results:
         points = points[points != current]
         
@@ -88,7 +125,7 @@ class gLEC(object):
         
         while not frontier.empty():
             current = frontier.get()
-            for _next in self.neighbours_func(current):
+            for _next in self.point_neighbours_func(current):
                 # Calculate the cost of going to this new point.
                 new_cost = cost_so_far[current] + self.travel_cost_func(current, _next)
                 # Calculate the eulerian distance to this new point.
@@ -116,6 +153,41 @@ class gLEC(object):
         return total_dist
 
 
-    def get_dist_from_point(self, point):
-        # Return a tuple of (the point id, it's cost)
-        return (point, self.get_total_distance_for_all_paths_to_point(point))
+    def get_area_covered_by_all_paths(self, start):
+        came_from, cost_so_far, dist_so_far = self.cost_search(start)
+
+        # Get a list of all the points we visted
+        all_visted_points = came_from.keys()
+
+        # We want a list of fully defined triangles - that is, where we visited all 3
+        # vertexes of the triangle.
+        neightris = []
+        for p in all_visted_points:
+            # For our current point, find all the triangles it is part of
+            neightris.extend(self.triangle_neighbours_func(p))
+        neightris = np.unique(np.array(neightris), axis=0)
+
+        # For each triangle the point is in, see if the other vertexs were visited in all_visited_points
+        good_tris = []
+        for tri in neightris:
+            if all(vertex in all_visted_points for vertex in tri):
+                # If all points in the tri have been visited, then it's a 'good tri'
+                good_tris.append(tri)
+        good_tris = np.array(good_tris)
+
+        def PolyArea(x,y):
+            # From https://stackoverflow.com/a/30408825
+            return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+
+        # For each good triangle, calculate the area, and add it to the total
+        area = 0.
+        for t in good_tris:
+            points = mesh.points[t,:]
+            area += PolyArea(points[:,0], points[:,1])
+
+        return area
+
+
+    def get_normalised_area_covered_by_all_paths(self, start, normalised_area = self.normalised_area):
+        return self.get_area_covered_by_all_paths(start) / self.normalised_area
+
