@@ -188,6 +188,8 @@ class gLEC(object):
         return area
 
 
-    def get_normalised_area_covered_by_all_paths(self, start, normalised_area = self.normalised_area):
-        return self.get_area_covered_by_all_paths(start) / self.normalised_area
+    def get_normalised_area_covered_by_all_paths(self, start, normalised_area = None):
+        if not normalised_area:
+            normalised_area = self.normalised_area
+        return self.get_area_covered_by_all_paths(start) / normalised_area
 
